@@ -130,31 +130,68 @@ ${weekToLabel(token)}`}
   </div>
 );
 
-const DetailPanel = ({ selected }) => {
+const DetailPanel = ({ selected, colorMap }) => {
   if (!selected.length) {
     return <div className="empty-state">Select courses to see overlapping weeks and assessment details.</div>;
   }
   return (
     <div className="course-details">
-      {selected.map((course) => (
-        <div className="detail-card" key={course.Course_Code}>
-          <h5>{course.Course_Name}</h5>
-          <p>{course.Summary}</p>
-          <p><strong>Exam:</strong> {course.Exam_Format}</p>
-          <p><strong>Credits:</strong> {course.Credits_Total} ECTS
-            {course.Written_Exam_Credits ? ` · Written ${course.Written_Exam_Credits}` : ''}
-            {course.Lab_Credits ? ` · Lab ${course.Lab_Credits}` : ''}
-            {course.Project_Report_Credits ? ` · Project ${course.Project_Report_Credits}` : ''}
-            {course.Oral_Credits ? ` · Oral ${course.Oral_Credits}` : ''}
-          </p>
-          <div>
-            {(course.Key_Topics || '').split(';').map((topic) => (
-              topic.trim() ? <span className="topic-chip" key={topic}>{topic.trim()}</span> : null
-            ))}
-          </div>
-          <p><a href={course.Link} target="_blank" rel="noreferrer">Open Studieinfo page ↗</a></p>
-        </div>
-      ))}
+      {selected.map((course) => {
+        const topics = (course.Key_Topics || '')
+          .split(';')
+          .map((topic) => topic.trim())
+          .filter(Boolean);
+        const creditTokens = [
+          Number(course.Written_Exam_Credits) > 0 && `Written ${course.Written_Exam_Credits} ECTS`,
+          Number(course.Lab_Credits) > 0 && `Lab ${course.Lab_Credits} ECTS`,
+          Number(course.Project_Report_Credits) > 0 && `Project ${course.Project_Report_Credits} ECTS`,
+          Number(course.Oral_Credits) > 0 && `Oral ${course.Oral_Credits} ECTS`
+        ].filter(Boolean);
+
+        const accent = (colorMap && colorMap[course.Course_Code]) || '#0ea5e9';
+
+        return (
+          <article
+            className="detail-card"
+            key={course.Course_Code}
+            style={{ '--accent': accent }}
+          >
+            <div className="detail-card__header">
+              <span className="detail-card__module">
+                Module {course.Timetable_Module || '—'}
+              </span>
+              <span className="detail-card__ects">{course.Credits_Total} ECTS</span>
+            </div>
+            <h5>{course.Course_Name}</h5>
+            <p className="summary">{course.Summary}</p>
+            <div className="detail-card__assessment">
+              <strong>Assessment</strong>
+              <p>{course.Exam_Format}</p>
+              {creditTokens.length ? (
+                <div className="credit-stack">
+                  {creditTokens.map((label) => (
+                    <span className="credit-chip" key={`${course.Course_Code}-${label}`}>{label}</span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            {topics.length ? (
+              <div className="detail-card__topics">
+                <strong>Key topics</strong>
+                <div className="topic-stack">
+                  {topics.map((topic) => (
+                    <span className="topic-chip" key={`${course.Course_Code}-${topic}`}>{topic}</span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="detail-card__footer">
+              <small>{course.Weeks ? `Weeks ${course.Weeks}` : 'Weeks TBD'}</small>
+              <a href={course.Link} target="_blank" rel="noreferrer">Open Studieinfo ↗</a>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 };
@@ -312,7 +349,7 @@ const App = () => {
         </div>
         <div className="panel">
           <h3>Assessment & topics</h3>
-          <DetailPanel selected={selectedCourses} />
+          <DetailPanel selected={selectedCourses} colorMap={colorMap} />
         </div>
         <div className="footer-note">React + CDN build (requires internet for React/Babel). Serve with any static file server.</div>
       </section>
