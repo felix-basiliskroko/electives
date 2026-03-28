@@ -13,6 +13,8 @@ const COLOR_PALETTE = [
 
 const MAX_WEEKS_PER_YEAR = 53;
 const TARGET_ECTS = 30;
+const EMBEDDING_EDGE_THRESHOLD = 0.65;
+const TOKEN_EDGE_THRESHOLD = 0.25;
 const ASSESSMENT_KEYWORDS = [
   'computer-based exam',
   'computer exam',
@@ -78,6 +80,193 @@ const computeTopicSimilarity = (tokensA = [], tokensB = []) => {
   });
   const union = setA.size + setB.size - intersection;
   return union ? intersection / union : 0;
+};
+
+const buildTokenGraph = (courses) => {
+  if (!courses.length) return { nodes: [], edges: [] };
+  const count = courses.length;
+  const nodes = courses.map((course, index) => {
+    const angle = (2 * Math.PI * index) / count;
+    const radius = 42;
+    const x = 50 + radius * Math.cos(angle);
+    const y = 50 + radius * Math.sin(angle);
+    return {
+      id: course.Course_Code,
+      name: course.Course_Name,
+      tokens: course.topicTokens || [],
+      x,
+      y
+    };
+  });
+
+  const edges = [];
+  const seen = new Set();
+  nodes.forEach((node, index) => {
+    const similarities = nodes
+      .map((other, otherIndex) => {
+        if (otherIndex === index) return null;
+        const weight = computeTopicSimilarity(node.tokens, other.tokens);
+        return weight > 0 ? { target: otherIndex, weight } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 2);
+
+    similarities.forEach(({ target, weight }) => {
+      const key = `${Math.min(index, target)}-${Math.max(index, target)}`;
+      if (!seen.has(key) && weight >= TOKEN_EDGE_THRESHOLD) {
+        seen.add(key);
+        edges.push({
+          source: index,
+          target,
+          weight
+        });
+      }
+    });
+  });
+
+  return { nodes, edges };
+};
+
+const buildEmbeddingGraph = (courses, embeddings) => {
+  const nodes = courses
+    .map((course, index) => {
+      const vector = embeddings[course.Course_Code];
+      if (!vector) return null;
+      return {
+        id: course.Course_Code,
+        name: course.Course_Name,
+        vector,
+        index
+      };
+    })
+    .filter(Boolean);
+
+  if (!nodes.length) return { nodes: [], edges: [] };
+
+  const normalizedVectors = nodes.map((node) => normalizeVector(node.vector));
+
+  const edges = [];
+  const seen = new Set();
+
+  nodes.forEach((node, idx) => {
+    const similarities = nodes
+      .map((other, jdx) => {
+        if (jdx === idx) return null;
+        const weight = cosineSimilarity(normalizedVectors[idx], normalizedVectors[jdx]);
+        return weight;
+      })
+      .map((weight, jdx) => (weight ? { target: jdx, weight } : null))
+      .filter(Boolean)
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 3);
+
+    similarities.forEach(({ target, weight }) => {
+      const key = `${Math.min(idx, target)}-${Math.max(idx, target)}`;
+      if (!seen.has(key) && weight >= EMBEDDING_EDGE_THRESHOLD) {
+        seen.add(key);
+        edges.push({ source: idx, target, weight });
+      }
+    });
+  });
+
+  const clusterPositions = computeClusterLayout(normalizedVectors);
+
+  const finalNodes = nodes.map((node, index) => ({
+    id: node.id,
+    name: node.name,
+    x: clusterPositions[index].x,
+    y: clusterPositions[index].y
+  }));
+
+  return { nodes: finalNodes, edges };
+};
+
+const cosineSimilarity = (a, b) => {
+  let sum = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    sum += a[i] * b[i];
+  }
+  return sum;
+};
+
+const normalizeVector = (vec) => {
+  const mag = Math.sqrt(vec.reduce((sum, value) => sum + value * value, 0)) || 1;
+  return vec.map((value) => value / mag);
+};
+
+const computeClusterLayout = (vectors) => {
+  const count = vectors.length;
+  if (!count) return [];
+  const clusterCount = Math.min(6, count);
+  const { assignments } = runKMeans(vectors, clusterCount);
+  const clusterMembers = new Map();
+  assignments.forEach((clusterIndex, nodeIndex) => {
+    if (!clusterMembers.has(clusterIndex)) clusterMembers.set(clusterIndex, []);
+    clusterMembers.get(clusterIndex).push(nodeIndex);
+  });
+
+  const positions = new Array(count);
+  const radius = 32;
+
+  clusterMembers.forEach((members, clusterIndex) => {
+    const angle = (2 * Math.PI * clusterIndex) / clusterMembers.size;
+    const clusterCenter = {
+      x: 50 + radius * Math.cos(angle),
+      y: 50 + radius * Math.sin(angle)
+    };
+    const innerRadius = Math.min(9, 4 + members.length * 0.4);
+    members.forEach((nodeIndex, localIndex) => {
+      const localAngle = (2 * Math.PI * localIndex) / Math.max(members.length, 1);
+      positions[nodeIndex] = {
+        x: clusterCenter.x + innerRadius * Math.cos(localAngle),
+        y: clusterCenter.y + innerRadius * Math.sin(localAngle)
+      };
+    });
+  });
+
+  return positions;
+};
+
+const runKMeans = (vectors, k, iterations = 20) => {
+  let centroids = vectors.slice(0, k).map((vec) => vec.slice());
+  let assignments = new Array(vectors.length).fill(0);
+
+  for (let iter = 0; iter < iterations; iter += 1) {
+    assignments = vectors.map((vector) => {
+      let bestIndex = 0;
+      let bestScore = -Infinity;
+      centroids.forEach((centroid, index) => {
+        const score = cosineSimilarity(vector, centroid);
+        if (score > bestScore) {
+          bestScore = score;
+          bestIndex = index;
+        }
+      });
+      return bestIndex;
+    });
+
+    const clusters = Array.from({ length: k }, () => []);
+    assignments.forEach((clusterIndex, nodeIndex) => {
+      clusters[clusterIndex].push(vectors[nodeIndex]);
+    });
+
+    centroids = clusters.map((members, index) => {
+      if (!members.length) {
+        const fallback = vectors[Math.floor(Math.random() * vectors.length)] || vectors[0];
+        return fallback.slice();
+      }
+      const summed = new Array(members[0].length).fill(0);
+      members.forEach((vector) => {
+        vector.forEach((value, idx) => {
+          summed[idx] += value;
+        });
+      });
+      return normalizeVector(summed);
+    });
+  }
+
+  return { assignments, centroids };
 };
 
 const parseWeekToken = (token = '') => {
@@ -197,57 +386,26 @@ ${weekToLabel(token)}`}
   </div>
 );
 
-const TopicGraph = ({ courses, selectedCodes, colorMap }) => {
+const TopicGraph = ({ courses, selectedCodes, colorMap, embeddings, embeddingError }) => {
   const graph = useMemo(() => {
+    const embeddingEntries = Object.keys(embeddings || {});
     if (!courses.length) return { nodes: [], edges: [] };
-    const count = courses.length;
-    const nodes = courses.map((course, index) => {
-      const angle = (2 * Math.PI * index) / count;
-      const radius = 42;
-      const x = 50 + radius * Math.cos(angle);
-      const y = 50 + radius * Math.sin(angle);
-      return {
-        id: course.Course_Code,
-        name: course.Course_Name,
-        tokens: course.topicTokens || [],
-        x,
-        y
-      };
-    });
 
-    const edges = [];
-    const seen = new Set();
-    nodes.forEach((node, index) => {
-      const similarities = nodes
-        .map((other, otherIndex) => {
-          if (otherIndex === index) return null;
-          const weight = computeTopicSimilarity(node.tokens, other.tokens);
-          return weight > 0 ? { target: otherIndex, weight } : null;
-        })
-        .filter(Boolean)
-        .sort((a, b) => b.weight - a.weight)
-        .slice(0, 2);
+    if (embeddingEntries.length) {
+      return buildEmbeddingGraph(courses, embeddings);
+    }
 
-      similarities.forEach(({ target, weight }) => {
-        const key = `${Math.min(index, target)}-${Math.max(index, target)}`;
-        if (!seen.has(key) && weight >= 0.15) {
-          seen.add(key);
-          edges.push({
-            source: nodes[index],
-            target: nodes[target],
-            weight
-          });
-        }
-      });
-    });
-
-    return { nodes, edges };
-  }, [courses]);
+    return buildTokenGraph(courses);
+  }, [courses, embeddings]);
 
   const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
 
   if (!graph.nodes.length) {
-    return <div className="empty-state">No course data for graph.</div>;
+    return (
+      <div className="empty-state">
+        {embeddingError || 'No course data for graph.'}
+      </div>
+    );
   }
 
   return (
@@ -255,11 +413,11 @@ const TopicGraph = ({ courses, selectedCodes, colorMap }) => {
       <svg viewBox="0 0 100 100" role="img" aria-label="Topic similarity graph">
         {graph.edges.map((edge, index) => (
           <line
-            key={`edge-${edge.source.id}-${edge.target.id}-${index}`}
-            x1={edge.source.x}
-            y1={edge.source.y}
-            x2={edge.target.x}
-            y2={edge.target.y}
+            key={`edge-${edge.source}-${edge.target}-${index}`}
+            x1={graph.nodes[edge.source].x}
+            y1={graph.nodes[edge.source].y}
+            x2={graph.nodes[edge.target].x}
+            y2={graph.nodes[edge.target].y}
             stroke="var(--border)"
             strokeWidth={0.4 + edge.weight * 0.6}
             opacity={0.3 + edge.weight * 0.4}
@@ -406,6 +564,8 @@ const App = () => {
   const [selectedCodes, setSelectedCodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [embeddings, setEmbeddings] = useState({});
+  const [embeddingError, setEmbeddingError] = useState(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark';
     return window.localStorage.getItem('liu-theme') || 'dark';
@@ -430,6 +590,30 @@ const App = () => {
       })
       .catch(() => setError('Unable to load courses.json.'))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch('./data/openai_embeddings.jsonl')
+      .then((res) => {
+        if (!res.ok) throw new Error('Embedding file not found.');
+        return res.text();
+      })
+      .then((text) => {
+        const lines = text.split('\n').filter((line) => line.trim().length);
+        const map = {};
+        lines.forEach((line) => {
+          try {
+            const record = JSON.parse(line);
+            if (record.courseCode && Array.isArray(record.embedding)) {
+              map[record.courseCode] = record.embedding;
+            }
+          } catch (e) {
+            // ignore malformed lines
+          }
+        });
+        setEmbeddings(map);
+      })
+      .catch((err) => setEmbeddingError(err.message));
   }, []);
 
   const faculties = useMemo(() => {
@@ -601,7 +785,13 @@ const App = () => {
         </div>
         <div className="panel">
           <h3>Topic similarity graph</h3>
-          <TopicGraph courses={courses} selectedCodes={selectedCodes} colorMap={colorMap} />
+          <TopicGraph
+            courses={courses}
+            selectedCodes={selectedCodes}
+            colorMap={colorMap}
+            embeddings={embeddings}
+            embeddingError={embeddingError}
+          />
         </div>
         <div className="footer-note">React + CDN build (requires internet for React/Babel). Serve with any static file server.</div>
       </section>

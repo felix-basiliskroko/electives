@@ -446,12 +446,12 @@ body.dark .credit-chip {
 
 .topic-graph {
   width: 100%;
-  min-height: 320px;
+  min-height: 360px;
 }
 
 .topic-graph svg {
   width: 100%;
-  height: 320px;
+  height: 360px;
 }
 
 .graph-node text {
