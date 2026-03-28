@@ -12,6 +12,51 @@ const COLOR_PALETTE = [
 ];
 
 const MAX_WEEKS_PER_YEAR = 53;
+const ASSESSMENT_KEYWORDS = [
+  'computer-based exam',
+  'computer exam',
+  'digital exam',
+  'take-home exam',
+  'home exam',
+  'written exam',
+  'oral exam',
+  'oral presentation',
+  'lab presentation',
+  'lab presentations',
+  'project presentation',
+  'lab report',
+  'lab reports',
+  'written project report',
+  'project report',
+  'group project',
+  'group lab',
+  'computer labs',
+  'lab assignments',
+  'computer assignments',
+  'graded assignment',
+  'problem-solving assignments',
+  'assignments',
+  'presentation',
+  'presentations',
+  'labs',
+  'seminar'
+].sort((a, b) => b.length - a.length);
+
+const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const ASSESSMENT_REGEX = new RegExp(`(${ASSESSMENT_KEYWORDS.map(escapeRegExp).join('|')})`, 'gi');
+
+const highlightAssessment = (text) => {
+  if (!text || !ASSESSMENT_KEYWORDS.length) return text;
+  return text.split(ASSESSMENT_REGEX).map((chunk, index) => {
+    if (!chunk) return null;
+    const isMatch = ASSESSMENT_KEYWORDS.some((keyword) => keyword.toLowerCase() === chunk.toLowerCase());
+    return isMatch ? (
+      <span key={`assessment-${index}`} className="assessment-highlight">{chunk}</span>
+    ) : (
+      chunk
+    );
+  });
+};
 
 const parseWeekToken = (token = '') => {
   if (!token || token.length !== 6) return null;
@@ -162,7 +207,7 @@ const DetailPanel = ({ selected, colorMap }) => {
   }
   return (
     <div className="course-details">
-      {selected.map((course) => {
+      {selected.map((course, index) => {
         const topics = (course.Key_Topics || '')
           .split(';')
           .map((topic) => topic.trim())
@@ -186,7 +231,7 @@ const DetailPanel = ({ selected, colorMap }) => {
           >
             <div className="detail-card__header">
               <span className="detail-card__module">
-                Module {course.Timetable_Module || '—'}
+                Elective {index + 1}
               </span>
               <span className="detail-card__ects">{course.Credits_Total} ECTS</span>
             </div>
@@ -194,7 +239,7 @@ const DetailPanel = ({ selected, colorMap }) => {
             <p className="summary">{course.Summary}</p>
             <div className="detail-card__assessment">
               <strong>Assessment</strong>
-              <p>{course.Exam_Format}</p>
+              <p>{highlightAssessment(course.Exam_Format)}</p>
               {creditTokens.length ? (
                 <div className="credit-stack">
                   {creditTokens.map((label) => (

@@ -286,6 +286,17 @@ body.dark .selector select {
   color: var(--text);
 }
 
+.assessment-highlight {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.25rem;
+  margin: 0 0.08rem;
+  font-weight: 600;
+  color: var(--accent, #0ea5e9);
+  border-bottom: 2px solid var(--accent, #0ea5e9);
+  border-radius: 4px;
+}
+
 .detail-card__topics {
   display: flex;
   flex-direction: column;
