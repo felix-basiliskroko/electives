@@ -12,6 +12,7 @@ const COLOR_PALETTE = [
 ];
 
 const MAX_WEEKS_PER_YEAR = 53;
+const TARGET_ECTS = 30;
 const ASSESSMENT_KEYWORDS = [
   'computer-based exam',
   'computer exam',
@@ -334,6 +335,31 @@ const App = () => {
 
   const colorMap = useColorMap(selectedCodes);
 
+  const totalDoubleBookedWeeks = useMemo(() => {
+    return Object.values(overlapMap).reduce((sum, count) => sum + Math.max(count - 1, 0), 0);
+  }, [overlapMap]);
+
+  const totalSelectedCredits = useMemo(() => {
+    return selectedCourses.reduce((sum, course) => {
+      const credits = Number(course.Credits_Total);
+      return sum + (Number.isFinite(credits) ? credits : 0);
+    }, 0);
+  }, [selectedCourses]);
+
+  const meanOverlapShare = useMemo(() => {
+    if (!selectedCourses.length) return 0;
+    const shares = selectedCourses.map((course) => {
+      if (!course.weekList.length) return 0;
+      const overlappedWeeks = course.weekList.reduce(
+        (acc, token) => acc + (overlapMap[token] > 1 ? 1 : 0),
+        0
+      );
+      return overlappedWeeks / course.weekList.length;
+    });
+    const total = shares.reduce((a, b) => a + b, 0);
+    return total / shares.length || 0;
+  }, [selectedCourses, overlapMap]);
+
   const toggleCourse = (code) => {
     setSelectedCodes((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
   };
@@ -403,9 +429,28 @@ const App = () => {
               <h2>Weekly overlap</h2>
               <p>{selectedCodes.length ? `${selectedCodes.length} course(s) selected` : 'Select courses to populate the grid.'}</p>
             </div>
-            <div className="overlap-strip">
-              <strong>Max overlap: {Math.max(0, ...Object.values(overlapMap))}</strong>
-              <div className="bar" />
+            <div className="overlap-metrics">
+              <div className="metric-card metric-card--credit">
+                <span className="metric-label">ECTS selected</span>
+                <div className="credit-metric">
+                  <span className={`credit-total ${totalSelectedCredits >= TARGET_ECTS ? 'good' : 'warn'}`}>
+                    {totalSelectedCredits}
+                  </span>
+                  <span className="credit-target">/{TARGET_ECTS}</span>
+                </div>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Multi-booked weeks</span>
+                <div className="metric-value">
+                  <strong>{totalDoubleBookedWeeks}</strong>
+                </div>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">Mean overlap share</span>
+                <div className="metric-value">
+                  <strong>{`${Math.round(meanOverlapShare * 100)}%`}</strong>
+                </div>
+              </div>
             </div>
           </div>
           <div className="timeline-grid">

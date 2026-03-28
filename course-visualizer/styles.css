@@ -199,22 +199,64 @@ body.dark .selector select {
   font-size: 0.75rem;
 }
 
-.overlap-strip {
+.overlap-metrics {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
+  flex-wrap: nowrap;
+  align-items: stretch;
 }
 
-.overlap-strip strong {
-  font-size: 0.85rem;
+.metric-card {
+  flex: 0 1 160px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: var(--panel-bg);
+  box-shadow: 0 6px 16px var(--shadow);
+}
+
+.metric-card--credit {
+  flex: 0 1 190px;
+}
+
+.metric-value strong {
+  font-size: 1.25rem;
   color: var(--text);
 }
 
-.overlap-strip .bar {
-  flex: 1;
-  height: 10px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #bae6fd, #0ea5e9);
+.metric-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.credit-metric {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.credit-total {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.credit-total.warn {
+  color: #dc2626;
+}
+
+.credit-total.good {
+  color: #16a34a;
+}
+
+.credit-target {
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 
 .course-details {
