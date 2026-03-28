@@ -131,6 +131,32 @@ ${weekToLabel(token)}`}
 );
 
 const DetailPanel = ({ selected, colorMap }) => {
+  const [expandedTopics, setExpandedTopics] = useState({});
+
+  useEffect(() => {
+    setExpandedTopics((prev) => {
+      const next = {};
+      selected.forEach((course) => {
+        if (prev[course.Course_Code]) {
+          next[course.Course_Code] = true;
+        }
+      });
+      return next;
+    });
+  }, [selected]);
+
+  const toggleTopics = (code) => {
+    setExpandedTopics((prev) => {
+      const next = { ...prev };
+      if (next[code]) {
+        delete next[code];
+      } else {
+        next[code] = true;
+      }
+      return next;
+    });
+  };
+
   if (!selected.length) {
     return <div className="empty-state">Select courses to see overlapping weeks and assessment details.</div>;
   }
@@ -149,6 +175,8 @@ const DetailPanel = ({ selected, colorMap }) => {
         ].filter(Boolean);
 
         const accent = (colorMap && colorMap[course.Course_Code]) || '#0ea5e9';
+        const isExpanded = Boolean(expandedTopics[course.Course_Code]);
+        const topicsId = `topics-${course.Course_Code}`;
 
         return (
           <article
@@ -177,8 +205,17 @@ const DetailPanel = ({ selected, colorMap }) => {
             </div>
             {topics.length ? (
               <div className="detail-card__topics">
-                <strong>Key topics</strong>
-                <div className="topic-stack">
+                <button
+                  type="button"
+                  className={`topics-toggle${isExpanded ? ' expanded' : ''}`}
+                  onClick={() => toggleTopics(course.Course_Code)}
+                  aria-expanded={isExpanded}
+                  aria-controls={topicsId}
+                >
+                  <strong>Key topics</strong>
+                  <span className="topics-toggle__action">{isExpanded ? 'Hide' : 'Show'}</span>
+                </button>
+                <div className="topic-stack" id={topicsId} hidden={!isExpanded}>
                   {topics.map((topic) => (
                     <span className="topic-chip" key={`${course.Course_Code}-${topic}`}>{topic}</span>
                   ))}
