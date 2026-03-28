@@ -444,6 +444,24 @@ body.dark .credit-chip {
   text-decoration: underline;
 }
 
+.topic-graph {
+  width: 100%;
+  min-height: 320px;
+}
+
+.topic-graph svg {
+  width: 100%;
+  height: 320px;
+}
+
+.graph-node text {
+  fill: var(--text);
+  font-size: 2.6px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
 .empty-state {
   border: 1px dashed var(--border);
   border-radius: 12px;

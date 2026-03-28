@@ -42,6 +42,7 @@ const ASSESSMENT_KEYWORDS = [
   'labs',
   'seminar'
 ].sort((a, b) => b.length - a.length);
+const STOP_WORDS = new Set(['and', 'of', 'the', 'for', 'to', 'in', 'with', 'on', 'an', 'a', 'by', 'or']);
 
 const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const ASSESSMENT_REGEX = new RegExp(`(${ASSESSMENT_KEYWORDS.map(escapeRegExp).join('|')})`, 'gi');
@@ -57,6 +58,26 @@ const highlightAssessment = (text) => {
       chunk
     );
   });
+};
+
+const tokenizeTopics = (topics = '') => {
+  return topics
+    .toLowerCase()
+    .split(/[^a-z0-9+]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
+};
+
+const computeTopicSimilarity = (tokensA = [], tokensB = []) => {
+  if (!tokensA.length || !tokensB.length) return 0;
+  const setA = new Set(tokensA);
+  const setB = new Set(tokensB);
+  let intersection = 0;
+  setA.forEach((token) => {
+    if (setB.has(token)) intersection += 1;
+  });
+  const union = setA.size + setB.size - intersection;
+  return union ? intersection / union : 0;
 };
 
 const parseWeekToken = (token = '') => {
@@ -175,6 +196,105 @@ ${weekToLabel(token)}`}
     })}
   </div>
 );
+
+const TopicGraph = ({ courses, selectedCodes, colorMap }) => {
+  const graph = useMemo(() => {
+    if (!courses.length) return { nodes: [], edges: [] };
+    const count = courses.length;
+    const nodes = courses.map((course, index) => {
+      const angle = (2 * Math.PI * index) / count;
+      const radius = 42;
+      const x = 50 + radius * Math.cos(angle);
+      const y = 50 + radius * Math.sin(angle);
+      return {
+        id: course.Course_Code,
+        name: course.Course_Name,
+        tokens: course.topicTokens || [],
+        x,
+        y
+      };
+    });
+
+    const edges = [];
+    const seen = new Set();
+    nodes.forEach((node, index) => {
+      const similarities = nodes
+        .map((other, otherIndex) => {
+          if (otherIndex === index) return null;
+          const weight = computeTopicSimilarity(node.tokens, other.tokens);
+          return weight > 0 ? { target: otherIndex, weight } : null;
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, 2);
+
+      similarities.forEach(({ target, weight }) => {
+        const key = `${Math.min(index, target)}-${Math.max(index, target)}`;
+        if (!seen.has(key) && weight >= 0.15) {
+          seen.add(key);
+          edges.push({
+            source: nodes[index],
+            target: nodes[target],
+            weight
+          });
+        }
+      });
+    });
+
+    return { nodes, edges };
+  }, [courses]);
+
+  const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
+
+  if (!graph.nodes.length) {
+    return <div className="empty-state">No course data for graph.</div>;
+  }
+
+  return (
+    <div className="topic-graph">
+      <svg viewBox="0 0 100 100" role="img" aria-label="Topic similarity graph">
+        {graph.edges.map((edge, index) => (
+          <line
+            key={`edge-${edge.source.id}-${edge.target.id}-${index}`}
+            x1={edge.source.x}
+            y1={edge.source.y}
+            x2={edge.target.x}
+            y2={edge.target.y}
+            stroke="var(--border)"
+            strokeWidth={0.4 + edge.weight * 0.6}
+            opacity={0.3 + edge.weight * 0.4}
+            strokeLinecap="round"
+          />
+        ))}
+        {graph.nodes.map((node) => {
+          const isActive = selectedSet.has(node.id);
+          const color = isActive ? colorMap[node.id] || '#94a3b8' : 'var(--border)';
+          const fillOpacity = isActive ? 1 : 0.25;
+          return (
+            <g key={node.id} className="graph-node">
+              <circle
+                cx={node.x}
+                cy={node.y}
+                r={isActive ? 2.2 : 1.6}
+                fill={color}
+                fillOpacity={fillOpacity}
+                stroke={isActive ? color : 'var(--border)'}
+                strokeOpacity={isActive ? 1 : 0.4}
+              >
+                <title>{node.name}</title>
+              </circle>
+              {isActive && (
+                <text x={node.x} y={node.y - 3} className="graph-label">
+                  {node.name.length > 16 ? `${node.name.slice(0, 15)}…` : node.name}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
 
 const DetailPanel = ({ selected, colorMap }) => {
   const [expandedTopics, setExpandedTopics] = useState({});
@@ -303,7 +423,8 @@ const App = () => {
               acc[token] = true;
               return acc;
             }, {});
-            return { ...row, weekList, weekLookup: lookup };
+            const topicTokens = tokenizeTopics(row.Key_Topics || row.Summary || '');
+            return { ...row, weekList, weekLookup: lookup, topicTokens };
           });
         setCourses(normalized);
       })
@@ -477,6 +598,10 @@ const App = () => {
         <div className="panel">
           <h3>Assessment & topics</h3>
           <DetailPanel selected={selectedCourses} colorMap={colorMap} />
+        </div>
+        <div className="panel">
+          <h3>Topic similarity graph</h3>
+          <TopicGraph courses={courses} selectedCodes={selectedCodes} colorMap={colorMap} />
         </div>
         <div className="footer-note">React + CDN build (requires internet for React/Babel). Serve with any static file server.</div>
       </section>
