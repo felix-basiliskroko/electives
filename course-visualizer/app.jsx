@@ -166,6 +166,10 @@ const App = () => {
   const [selectedCodes, setSelectedCodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'dark';
+    return window.localStorage.getItem('liu-theme') || 'dark';
+  });
 
   useEffect(() => {
     fetch('./courses.json')
@@ -215,6 +219,13 @@ const App = () => {
     setSelectedCodes((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
   };
 
+  useEffect(() => {
+    document.body.classList.toggle('dark', theme === 'dark');
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('liu-theme', theme);
+    }
+  }, [theme]);
+
   if (loading) {
     return <div className="app-shell"><div className="panel">Loading courses…</div></div>;
   }
@@ -227,6 +238,16 @@ const App = () => {
     <div className="app-shell">
       <aside className="sidebar panel">
         <h2>Pick electives</h2>
+        <div className="theme-toggle">
+          <label className="checkbox-toggle">
+            <input
+              type="checkbox"
+              checked={theme === 'dark'}
+              onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')}
+            />
+            <span>Dark mode</span>
+          </label>
+        </div>
         <div className="search">
           <input
             type="text"
