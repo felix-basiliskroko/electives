@@ -13,7 +13,7 @@ const COLOR_PALETTE = [
 
 const MAX_WEEKS_PER_YEAR = 53;
 const TARGET_ECTS = 30;
-const EMBEDDING_EDGE_THRESHOLD = 0.65;
+const EMBEDDING_EDGE_THRESHOLD = 0.7;
 const TOKEN_EDGE_THRESHOLD = 0.25;
 const ASSESSMENT_KEYWORDS = [
   'computer-based exam',
@@ -387,6 +387,7 @@ ${weekToLabel(token)}`}
 );
 
 const TopicGraph = ({ courses, selectedCodes, colorMap, embeddings, embeddingError }) => {
+  const [hoveredId, setHoveredId] = useState(null);
   const graph = useMemo(() => {
     const embeddingEntries = Object.keys(embeddings || {});
     if (!courses.length) return { nodes: [], edges: [] };
@@ -411,25 +412,17 @@ const TopicGraph = ({ courses, selectedCodes, colorMap, embeddings, embeddingErr
   return (
     <div className="topic-graph">
       <svg viewBox="0 0 100 100" role="img" aria-label="Topic similarity graph">
-        {graph.edges.map((edge, index) => (
-          <line
-            key={`edge-${edge.source}-${edge.target}-${index}`}
-            x1={graph.nodes[edge.source].x}
-            y1={graph.nodes[edge.source].y}
-            x2={graph.nodes[edge.target].x}
-            y2={graph.nodes[edge.target].y}
-            stroke="var(--border)"
-            strokeWidth={0.4 + edge.weight * 0.6}
-            opacity={0.3 + edge.weight * 0.4}
-            strokeLinecap="round"
-          />
-        ))}
         {graph.nodes.map((node) => {
           const isActive = selectedSet.has(node.id);
           const color = isActive ? colorMap[node.id] || '#94a3b8' : 'var(--border)';
           const fillOpacity = isActive ? 1 : 0.25;
           return (
-            <g key={node.id} className="graph-node">
+            <g
+              key={node.id}
+              className="graph-node"
+              onMouseEnter={() => setHoveredId(node.id)}
+              onMouseLeave={() => setHoveredId(null)}
+            >
               <circle
                 cx={node.x}
                 cy={node.y}
@@ -441,7 +434,7 @@ const TopicGraph = ({ courses, selectedCodes, colorMap, embeddings, embeddingErr
               >
                 <title>{node.name}</title>
               </circle>
-              {isActive && (
+              {(isActive || hoveredId === node.id) && (
                 <text x={node.x} y={node.y - 3} className="graph-label">
                   {node.name.length > 16 ? `${node.name.slice(0, 15)}…` : node.name}
                 </text>
@@ -482,7 +475,7 @@ const DetailPanel = ({ selected, colorMap }) => {
   };
 
   if (!selected.length) {
-    return <div className="empty-state">Select courses to see overlapping weeks and assessment details.</div>;
+    return <div className="empty-state">Select courses to see overlap and course details.</div>;
   }
   return (
     <div className="course-details">
@@ -687,7 +680,7 @@ const App = () => {
   return (
     <div className="app-shell">
       <aside className="sidebar panel">
-        <h2>Pick electives</h2>
+        <h2>Possible electives to pick from:</h2>
         <div className="theme-toggle">
           <label className="checkbox-toggle">
             <input
@@ -731,8 +724,8 @@ const App = () => {
         <div className="panel">
           <div className="timeline-header">
             <div>
-              <h2>Weekly overlap</h2>
-              <p>{selectedCodes.length ? `${selectedCodes.length} course(s) selected` : 'Select courses to populate the grid.'}</p>
+              <h2>Overlap</h2>
+              <p>{selectedCodes.length ? `${selectedCodes.length} course(s) selected` : 'Select courses to see any overlap.'}</p>
             </div>
             <div className="overlap-metrics">
               <div className="metric-card metric-card--credit">
@@ -780,11 +773,20 @@ const App = () => {
           </div>
         </div>
         <div className="panel">
-          <h3>Assessment & topics</h3>
+          <h3>Elective Details</h3>
           <DetailPanel selected={selectedCourses} colorMap={colorMap} />
         </div>
         <div className="panel">
-          <h3>Topic similarity graph</h3>
+          <div className="panel-heading">
+            <h3>Similarity Graph</h3>
+            <span className="info-badge" role="img" aria-label="Graph info">
+              ?
+              <span className="info-tooltip">
+                This graph uses openai's <strong>text-embedding-3-large</strong> embedding model to vectorize and embed elective courses and cluster them by cosine similarity.
+                Nearby nodes share more topic overlap. Embedding was done soley based on the course syllabus.
+              </span>
+            </span>
+          </div>
           <TopicGraph
             courses={courses}
             selectedCodes={selectedCodes}
