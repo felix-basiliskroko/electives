@@ -363,8 +363,14 @@ const CourseCard = ({ course, isSelected, onToggle }) => (
   </div>
 );
 
-const CourseRow = ({ course, weeks, color }) => (
-  <div className="course-row">
+const CourseRow = ({ course, weeks, color, onRemove }) => (
+  <div
+    className="course-row"
+    onDoubleClick={() => {
+      if (onRemove) onRemove(course.Course_Code);
+    }}
+    title="Double-click to remove this course from the selection"
+  >
     <div className="course-meta">
       <strong style={{ color }}>{course.Course_Name}</strong>
       <small>
@@ -662,6 +668,14 @@ const App = () => {
     setSelectedCodes((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
   };
 
+  const removeCourse = (code) => {
+    setSelectedCodes((prev) => prev.filter((c) => c !== code));
+  };
+
+  const clearSelection = () => {
+    setSelectedCodes([]);
+  };
+
   useEffect(() => {
     document.body.classList.toggle('dark', theme === 'dark');
     if (typeof window !== 'undefined') {
@@ -724,7 +738,17 @@ const App = () => {
         <div className="panel">
           <div className="timeline-header">
             <div>
-              <h2>Overlap</h2>
+              <div className="timeline-title">
+                <h2>Overlap</h2>
+                <button
+                  type="button"
+                  className="clear-selection-btn"
+                  onClick={clearSelection}
+                  disabled={!selectedCodes.length}
+                >
+                  Clear selection
+                </button>
+              </div>
               <p>{selectedCodes.length ? `${selectedCodes.length} course(s) selected` : 'Select courses to see any overlap.'}</p>
             </div>
             <div className="overlap-metrics">
@@ -765,6 +789,7 @@ const App = () => {
                   course={course}
                   weeks={weekUniverse}
                   color={colorMap[course.Course_Code]}
+                  onRemove={removeCourse}
                 />
               ))
             ) : (

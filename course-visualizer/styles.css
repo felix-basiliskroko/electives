@@ -156,6 +156,36 @@ body.dark .selector select {
   gap: 1rem;
 }
 
+.timeline-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clear-selection-btn {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.clear-selection-btn:not(:disabled):hover {
+  color: var(--text);
+  border-color: var(--text);
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.clear-selection-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .timeline-grid {
   overflow-x: auto;
 }
@@ -166,6 +196,10 @@ body.dark .selector select {
   grid-template-columns: 220px repeat(auto-fit, minmax(12px, 1fr));
   gap: 4px;
   align-items: center;
+}
+
+.course-row {
+  cursor: pointer;
 }
 
 .week-labels {
