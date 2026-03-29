@@ -868,7 +868,17 @@ const App = () => {
             embeddingError={embeddingError}
           />
         </div>
-        <div className="footer-note">This is an unofficial tool and is not affiliated with LiU or responsible for course data accuracy. Use at your own risk.</div>
+        <div className="footer-note">
+          This is an unofficial tool and is not affiliated with LiU or responsible for course data accuracy. Use at your own risk.
+          {' '}
+          <a
+            href="https://github.com/felix-basiliskroko/electives"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Find more information on GitHub ↗
+          </a>
+        </div>
       </section>
     </div>
   );
