@@ -3,7 +3,7 @@
 Interactive React + Vite tool for comparing LiU third‑semester electives. It renders the programme’s elective list, lets you build a tentative schedule, and highlights week overlaps, cumulative ECTS, and topical similarity between courses.
 
 <div align="center">
-  <img src="./course-visualizer/assets/app.png" alt="Course Visualizer screenshot" width="800">
+  <img src="assets/app.png" alt="Course Visualizer screenshot" width="800">
 </div>
 
 
