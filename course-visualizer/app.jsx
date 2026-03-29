@@ -501,6 +501,8 @@ const DetailPanel = ({ selected, colorMap }) => {
         const isExpanded = Boolean(expandedTopics[course.Course_Code]);
         const topicsId = `topics-${course.Course_Code}`;
 
+        const examinerName = (course.Examiner || '').trim();
+
         return (
           <article
             className="detail-card"
@@ -514,6 +516,9 @@ const DetailPanel = ({ selected, colorMap }) => {
               <span className="detail-card__ects">{course.Credits_Total} ECTS</span>
             </div>
             <h5>{course.Course_Name}</h5>
+            <p className="detail-card__examiner">
+              {examinerName ? `Examiner: ${examinerName}` : 'Examiner: TBD'}
+            </p>
             <p className="summary">{course.Summary}</p>
             <div className="detail-card__assessment">
               <strong>Assessment</strong>
@@ -676,6 +681,39 @@ const App = () => {
     setSelectedCodes([]);
   };
 
+  const exportSelectedCourses = () => {
+    if (!selectedCourses.length || typeof window === 'undefined') return;
+
+    const header = ['Title', 'Code', 'Credits', 'Department', 'Studieinfo URL'];
+    const rows = selectedCourses.map((course) => [
+      course.Course_Name || '',
+      course.Course_Code || '',
+      Number(course.Credits_Total) || 0,
+      course.Department || course.Faculty || '',
+      course.Link || ''
+    ]);
+
+    const escapeCell = (value) => {
+      const fallback = value === null || value === undefined ? '' : value;
+      const stringValue = String(fallback);
+      const needsWrap = /[",\n]/.test(stringValue);
+      const escaped = stringValue.replace(/"/g, '""');
+      return needsWrap ? `"${escaped}"` : escaped;
+    };
+
+    const csv = [header, ...rows].map((row) => row.map(escapeCell).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.setAttribute('download', `selected-electives-${timestamp}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     document.body.classList.toggle('dark', theme === 'dark');
     if (typeof window !== 'undefined') {
@@ -798,7 +836,17 @@ const App = () => {
           </div>
         </div>
         <div className="panel">
-          <h3>Elective Details</h3>
+          <div className="panel-heading">
+            <h3>Elective Details</h3>
+            <button
+              type="button"
+              className="detail-export-btn"
+              onClick={exportSelectedCourses}
+              disabled={!selectedCourses.length}
+            >
+              Export
+            </button>
+          </div>
           <DetailPanel selected={selectedCourses} colorMap={colorMap} />
         </div>
         <div className="panel">
@@ -820,7 +868,7 @@ const App = () => {
             embeddingError={embeddingError}
           />
         </div>
-        <div className="footer-note">React + CDN build (requires internet for React/Babel). Serve with any static file server.</div>
+        <div className="footer-note">This is an unofficial tool and is not affiliated with LiU or responsible for course data accuracy. Use at your own risk.</div>
       </section>
     </div>
   );
